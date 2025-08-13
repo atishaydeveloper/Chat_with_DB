@@ -1,0 +1,901 @@
+sources:
+  my-db:
+    kind: mssql
+    host: eeeit.work
+    port: 1433
+    database: HardaIndoreERPDummy
+    user: H@rd@_IND
+    password: H@rD@DmY
+
+tools:
+  count_bilties_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Count BiltyMaster entries by month and year
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT COUNT(BiltyNo) AS TotalBilties
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  total_unpaid_bilties_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Total unpaid bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT COUNT(BiltyNo) as TotalUnpaidBilties
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year AND PayMode = 'To pay';
+
+  daily_breakdown_bilty_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Daily breakdown of bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT CONVERT(varchar(10), BiltyDate, 103) as BiltyDate,COUNT(BiltyNo) AS TotalRecords,SUM(NetFreight) AS TotalAmount
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY CONVERT(varchar(10), BiltyDate, 103)
+      ORDER BY  BiltyDate;
+
+  average_bilty_value_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Calculates average bilty value by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT AVG(NetFreight) as AverageBiltyValue
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  total_paid_bilties_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Counts total paid bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Count(BiltyNo)
+      From BiltyMaster
+      Where MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year and PayMode = 'Paid';
+
+  percentage_of_paid_unpaid_bilties_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Calculates the percentage of paid to unpaid bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT
+      COUNT(Case When PayMode = 'Paid' then 1 End) * 100.0 / COUNT(BiltyNo) AS PaidPercentage,
+      COUNT(Case When PayMode = 'To Pay' then 1 End) * 100.0 / COUNT(BiltyNo) AS UnPaidPercentage
+      FROM BiltyMaster
+      Where MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  top_5_branches_paid_bilties_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Top 5 branches with the highest paid bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT TOP (5) Branch.BranchName, SUM(BiltyMaster.Cartage) AS Cartage
+      FROM BiltyMaster
+      INNER JOIN Branch ON BiltyMaster.BranchId = Branch.BranchID AND BiltyMaster.CompID = Branch.CompID
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY dbo.Branch.BranchName
+
+  sum_crossing_Recd_Weight_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Sum of Crossing Recd Weight from CrDetail entries by month and year
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT SUM(CrDetail.Weight) AS Weight
+      FROM dbo.CrMaster
+      INNER JOIN dbo.CrDetail ON dbo.CrMaster.DocNo = dbo.CrDetail.DocNo AND dbo.CrMaster.BranchID = dbo.CrDetail.BranchID AND dbo.CrMaster.SessionID = dbo.CrDetail.SessionID AND dbo.CrMaster.CompID = dbo.CrDetail.CompID AND dbo.CrMaster.UniqueDocno =   dbo.CrDetail.UniqueDocno
+      WHERE MONTH(CrMaster.DocDate) = @month AND YEAR(CrMaster.DocDate) = @year;
+
+  average_crossing_recd_weight_per_challan_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Average crossing received weight per challan by month and year.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT AVG(Weight) as AverageWeight
+      FROM Crossing
+      WHERE MONTH(CrossingDate) = @month AND YEAR(CrossingDate) = @year;
+
+  maximum_crossing_recd_weight_in_a_single_challan_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Maximum crossing received weight in a single challan by month and year.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT MAX(Weight) as MaximumWeight
+      FROM Crossing
+      WHERE MONTH(CrossingDate) = @month AND YEAR(CrossingDate) = @year;
+
+  branch_wise_crossing_recd_weight_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise crossing received weight by month and year.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, SUM(Crossing.Weight) as TotalWeight
+      FROM Crossing
+      INNER JOIN Branch ON Crossing.BranchId = Branch.BranchID
+      WHERE MONTH(CrossingDate) = @month AND YEAR(CrossingDate) = @year
+      GROUP BY Branch.BranchName;
+
+  total_paid_cartage_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Total paid cartage by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Sum(Cartage)
+      From BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      And PayMode = 'Paid';
+
+  total_unpaid_cartage_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Total unpaid cartage by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Sum(Cartage)
+      From BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      And PayMode = 'To Pay';
+
+  percentage_of_paid_unpaid_cartage_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Percentage of paid and unpaid cartage by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT
+      COUNT(Case When PayMode = 'Paid' then 1 End) * 100.0 / COUNT(BiltyNo) AS PaidPercentage,
+      COUNT(Case When PayMode = 'To Pay' then 1 End) * 100.0 / COUNT(BiltyNo) AS UnPaidPercentage
+      FROM BiltyMaster
+      Where  MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      AND Cartage > 0;
+
+
+  branch_wise_paid_cartage_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise paid cartage by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, GoDown.GodownName , Sum(Cartage) as Cartage
+      FROM  BiltyMaster
+      INNER JOIN GoDown
+      ON BiltyMaster.CompID = GoDown.CompID
+      AND BiltyMaster.BranchId = GoDown.BranchID
+      AND BiltyMaster.GodownID = GoDown.GodownID
+      INNER JOIN Branch ON GoDown.BranchID = Branch.BranchID
+      AND GoDown.CompID = Branch.CompID
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY Branch.BranchName, GoDown.GodownName
+
+  average_cartage_per_bilty_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Average cartage per bilty by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Sum(Cartage)  / COUNT(BiltyNo) AS AvgCartage
+      FROM BiltyMaster
+      WHERE MONTH(CartageDate) = @month AND YEAR(CartageDate) = @year and Cartage > 0;
+
+  sum_biltiesWeight_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Sum of Bilties Weight from BiltyMaster entries by month and year
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT SUM(Weight) AS TotalWeight
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  average_bilty_weight_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Average bilty weight by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT AVG(Weight) as AverageWeight
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  maximum_bilty_weight_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Maximum bilty weight by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT MAX(Weight) as MaximumWeight
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  branch_wise_sum_bilties_weight_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise sum of bilty weights by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, SUM(Weight) as TotalWeight
+      FROM BiltyMaster
+      INNER JOIN Branch ON BiltyMaster.BranchId = Branch.BranchID
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY Branch.BranchName;
+
+  total_crossing_challan_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Counts total crossing challans by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Count(DocNo)
+      From GMemoM
+      Where MONTH(DocDate) = @month AND YEAR(DocDate) = @year AND ChType = 'C';
+
+  paid_crossing_challans_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Paid crossing challans by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT COUNT(*) as TotalPaidChallans
+      FROM CrossingChallan
+      WHERE MONTH(ChallanDate) = @month AND YEAR(ChallanDate) = @year AND PayMode = 'Paid';
+
+  unpaid_crossing_challans_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Unpaid crossing challans by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT COUNT(*) as TotalUnpaidChallans
+      FROM CrossingChallan
+      WHERE MONTH(ChallanDate) = @month AND YEAR(ChallanDate) = @year AND PayMode = 'Due';
+
+  vehicle_wise_crossing_challan_summary_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Vehicle-wise crossing challan summary by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Vehicle.VehicleNumber, COUNT(*) as TotalChallans
+      FROM CrossingChallan
+      INNER JOIN Vehicle ON CrossingChallan.VehicleId = Vehicle.VehicleID
+      WHERE MONTH(ChallanDate) = @month AND YEAR(ChallanDate) = @year
+      GROUP BY Vehicle.VehicleNumber;
+
+  sum_paid_amount_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Sums the paid amount for bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Sum(NetFreight)
+      From BiltyMaster
+      Where MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year and PayMode = 'Paid';
+
+  total_unpaid_amount_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Total unpaid amount by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Sum(NetFreight)
+      From BiltyMaster
+      Where MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year and PayMode = 'To Pay';
+
+  daily_paid_amount_trend_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Daily paid amount trend by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT CONVERT(varchar(10), BiltyDate, 103) as BiltyDate,COUNT(BiltyNo) AS TotalRecords, SUM(NetFreight) AS TotalAmount
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year and PayMode = 'Paid'
+      GROUP BY CONVERT(varchar(10), BiltyDate, 103)
+      ORDER BY BiltyDate;
+
+  branch_wise_paid_amount_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise paid amount by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, Sum(Cartage) AS PaidCartage , 0.00 as UnPaidCartage
+      FROM BiltyMaster
+      INNER JOIN dbo.Branch
+      ON BiltyMaster.BranchId = Branch.BranchID AND BiltyMaster.CompID = Branch.CompID
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year AND (BiltyMaster.PayMode = 'Paid') and Cartage > 0
+      GROUP BY Branch.BranchName;
+
+  paid_amount_due_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Sums the paid amount due for bilties by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Sum(NetFreight)
+      From BiltyMaster
+      Where MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year and PayMode = 'Paid' and PaymentMode = 'Due' and (PMemoNo is null or PMemoNo = 0);
+
+  total_overdue_amount_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Total overdue amount by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT SUM(NetFreight) as TotalOverdueAmount
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year AND PayMode = 'Due';
+
+  top_10_customers_with_highest_due_amount:
+    kind: mssql-sql
+    source: my-db
+    description: Top 10 customers with the highest due amount by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT TOP 10 Customer.CustomerName, SUM(NetFreight) as TotalDueAmount
+      FROM BiltyMaster
+      INNER JOIN Customer ON BiltyMaster.CustomerId = Customer.CustomerID
+      WHERE MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year AND PayMode = 'Due'
+      GROUP BY Customer.CustomerName
+      ORDER BY TotalDueAmount DESC;
+
+  payment_recovery_rate_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Payment recovery rate by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT
+        (SUM(CASE WHEN PayMode = 'Paid' THEN NetFreight ELSE 0 END) * 100.0 / NULLIF(SUM(NetFreight), 0)) AS PaymentRecoveryRate
+      FROM BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year;
+
+  total_Vehicle_Load_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Counts total vehicle loads by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      Select Count(FmNo)
+      From FMemoM
+      Where MONTH(FmDate) = @month AND YEAR(FmDate) = @year;
+
+  average_vehicle_load_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Average vehicle load by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT MONTH(BiltyDate) as Month, AVG(NetWeight) as AverageLoad
+      FROM BiltyMaster
+      WHERE YEAR(BiltyDate) = @year
+      GROUP BY MONTH(BiltyDate);
+
+  maximum_vehicle_load_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Maximum vehicle load by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Top(1) Branch.BranchName, FMemoM.Routs, FMemoM.LorryNo, COUNT(FMemoM.FmNo) AS FmNo
+      FROM FMemoM INNER JOIN Branch ON FMemoM.BranchID = Branch.BranchID AND FMemoM.CompID = Branch.CompID
+      WHERE MONTH(FMemoM.FmDate) = @month AND YEAR(FMemoM.FmDate) = @year
+      GROUP BY FMemoM.Routs, Branch.BranchName, FMemoM.LorryNo
+      ORDER BY COUNT(FMemoM.FmNo) DESC;
+
+  route_wise_vehicle_load_summary_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Route-wise vehicle load summary by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, FMemoM.Routs, COUNT(FMemoM.FmNo) AS FmNo
+      FROM FMemoM
+      INNER JOIN Branch ON FMemoM.BranchID = Branch.BranchID AND FMemoM.CompID = Branch.CompID
+      WHERE MONTH(FMemoM.FmDate) = @month AND YEAR(FMemoM.FmDate) = @year
+      GROUP BY FMemoM.Routs, Branch.BranchName;
+
+  branch_godown_wise_total_cartage:
+    kind: mssql-sql
+    source: my-db
+    description: Branch + Godown wise total cartage for a date range
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, GoDown.GodownName, SUM(Cartage) as Cartage
+      FROM BiltyMaster
+      INNER JOIN GoDown ON BiltyMaster.CompID = GoDown.CompID AND BiltyMaster.BranchId = GoDown.BranchID AND BiltyMaster.GodownID = GoDown.GodownID
+      INNER JOIN Branch ON GoDown.BranchID = Branch.BranchID AND GoDown.CompID = Branch.CompID
+      WHERE MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year
+      GROUP BY Branch.BranchName, GoDown.GodownName;
+
+  branch_wise_paid_vs_unpaid_cartage:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise paid vs unpaid cartage for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, Sum(Cartage) AS PaidCartage , 0.00 as UnPaidCartage
+      FROM BiltyMaster INNER JOIN Branch ON BiltyMaster.BranchId = Branch.BranchID AND BiltyMaster.CompID = Branch.CompID
+      WHERE  MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year AND (BiltyMaster.PayMode = 'Paid') and Cartage > 0
+      GROUP BY Branch.BranchName
+      union All
+      SELECT Branch.BranchName,  0.00 as PaidCartage,  Sum(Cartage) AS UnPaidCartage
+      FROM BiltyMaster
+      INNER JOIN Branch ON BiltyMaster.BranchId = Branch.BranchID AND BiltyMaster.CompID = Branch.CompID
+      WHERE  MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year AND (BiltyMaster.PayMode = 'To Pay') and Cartage > 0
+      GROUP BY Branch.BranchName;
+
+  godown_wise_cartage_share:
+    kind: mssql-sql
+    source: my-db
+    description: Godown-wise cartage share for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, GoDown.GodownName , Sum(Cartage) as Cartage
+      FROM  BiltyMaster
+      INNER JOIN GoDown ON BiltyMaster.CompID = GoDown.CompID AND BiltyMaster.BranchId = GoDown.BranchID AND BiltyMaster.GodownID = GoDown.GodownID
+      INNER JOIN Branch ON GoDown.BranchID = Branch.BranchID AND GoDown.CompID = Branch.CompID
+      WHERE MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year
+      GROUP BY Branch.BranchName, GoDown.GodownName;
+
+  monthly_cartage_comparison_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Monthly cartage comparison by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT DATENAME(month, Biltydate) AS Month, SUM(Cartage) AS TotalCartage, COUNT(BiltyNo) AS TotalBilties
+      FROM  BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY  DATENAME(month, Biltydate)
+      ORDER BY  Month;
+
+  branch_godown_wise_total_paid_bilty:
+    kind: mssql-sql
+    source: my-db
+    description: Branch + Godown wise total paid bilties for a date range
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, GoDown.GodownName, COUNT(BiltyNo) as TotalPaidBilties
+      FROM BiltyMaster
+      INNER JOIN GoDown ON BiltyMaster.CompID = GoDown.CompID AND BiltyMaster.BranchId = GoDown.BranchID AND BiltyMaster.GodownID = GoDown.GodownID
+      INNER JOIN Branch ON GoDown.BranchID = Branch.BranchID AND GoDown.CompID = Branch.CompID
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year AND PayMode = 'Paid'
+      GROUP BY Branch.BranchName, GoDown.GodownName;
+
+  branch_wise_unpaid_bilties:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise unpaid bilty breakdown for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, COUNT(BiltyMaster.BiltyNo) AS BiltyNo
+      FROM BiltyMaster
+      INNER JOIN Branch ON BiltyMaster.BranchId = Branch.BranchID AND BiltyMaster.CompID = Branch.CompID
+      WHERE MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year AND (BiltyMaster.PayMode = 'To Pay')
+      GROUP BY Branch.BranchName;
+
+
+  godown_wise_paid_bilty_share:
+    kind: mssql-sql
+    source: my-db
+    description: Godown-wise paid bilty share for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, GoDown.GodownName , Count(BiltyNo) as BiltyNo FROM BiltyMaster
+      INNER JOIN GoDown ON BiltyMaster.CompID = GoDown.CompID AND BiltyMaster.BranchId = GoDown.BranchID AND BiltyMaster.GodownID = GoDown.GodownID
+      INNER JOIN Branch ON GoDown.BranchID = Branch.BranchID AND GoDown.CompID = Branch.CompID
+      WHERE MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year AND (BiltyMaster.PayMode = 'Paid')  GROUP BY Branch.BranchName, GoDown.GodownName;
+
+  monthly_paid_bilty_comparison_by_month:
+    kind: mssql-sql
+    source: my-db
+    description: Monthly paid bilty comparison by month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT DATENAME(month, BiltyDate) AS Month, SUM(NetFreight) AS TotalPaid, COUNT(BiltyNo) AS TotalBilties
+      FROM  BiltyMaster
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year and PayMode = 'Paid'
+      GROUP BY  DATENAME(month, BiltyDate)
+      ORDER BY  Month;
+
+  booking_bilty_by_month_summary:
+    kind: mssql-sql
+    source: my-db
+    description: Booking Bilty by month summary
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT Branch.BranchName, GoDown.GodownName, PayMode, Sum(BiltyMaster.Package) as Package, Count(BiltyMaster.BiltyNo) as BiltyNo,Sum(BiltyMaster.Weight) as Weight, Sum(NetFreight) as NetFreight
+      FROM BiltyMaster
+      INNER JOIN GoDown ON BiltyMaster.CompID = GoDown.CompID AND BiltyMaster.BranchId = GoDown.BranchID AND BiltyMaster.GodownID = GoDown.GodownID
+      INNER JOIN Branch ON GoDown.BranchID = Branch.BranchID AND GoDown.CompID = Branch.CompID
+      WHERE MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY Branch.BranchName, GoDown.GodownName, PayMode;
+
+  booking_bilty_count_per_day:
+    kind: mssql-sql
+    source: my-db
+    description: Booking bilty count per day for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT CONVERT(varchar(10), BiltyDate, 103) as BiltyDate,COUNT(BiltyNo) AS TotalRecords,SUM(NetFreight) AS  TotalAmount
+      FROM BiltyMaster
+      WHERE  MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY CONVERT(varchar(10), BiltyDate, 103)
+      ORDER BY  BiltyDate;
+
+  booking_bilty_weight_summary:
+    kind: mssql-sql
+    source: my-db
+    description: Booking bilty weight summary for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT CONVERT(varchar(10), BiltyDate, 103) as BiltyDate,Sum(Weight) AS Weight
+      FROM BiltyMaster
+      WHERE  MONTH(BiltyDate) = @month AND YEAR(BiltyDate) = @year
+      GROUP BY CONVERT(varchar(10), BiltyDate, 103)
+      ORDER BY  BiltyDate;
+
+
+  branch_wise_booking_bilty_breakdown:
+    kind: mssql-sql
+    source: my-db
+    description: Branch-wise booking bilty breakdown for a specific month and year. Input should be a month (1-12) and year (YYYY). If input is 'July 2025', it will parse the month and year automatically.
+    parameters:
+      - name: month
+        type: integer
+        description: Month number (1-12)
+      - name: year
+        type: integer
+        description: Full year (e.g., 2025)
+    statement: >
+      SELECT   Branch.BranchName, COUNT(BiltyMaster.BiltyNo) AS BiltyNo
+      FROM BiltyMaster
+      INNER JOIN Branch ON BiltyMaster.BranchId = Branch.BranchID AND BiltyMaster.CompID = Branch.CompID
+      WHERE  MONTH(BiltyMaster.BiltyDate) = @month AND YEAR(BiltyMaster.BiltyDate) = @year AND (BiltyMaster.PayMode = 'Paid')
+      GROUP BY Branch.BranchName;
+
+toolsets:
+  basic:
+    - count_bilties_by_month
+    - total_unpaid_bilties_by_month
+    - daily_breakdown_bilty_by_month
+    - average_bilty_value_by_month
+    - total_paid_bilties_by_month
+    - percentage_of_paid_unpaid_bilties_by_month
+    - top_5_branches_paid_bilties_by_month
+    - sum_crossing_Recd_Weight_by_month
+    - average_crossing_recd_weight_per_challan_by_month
+    - maximum_crossing_recd_weight_in_a_single_challan_by_month
+    - branch_wise_crossing_recd_weight_by_month
+    - total_paid_cartage_by_month
+    - total_unpaid_cartage_by_month
+    - percentage_of_paid_unpaid_cartage_by_month
+    - branch_wise_paid_cartage_by_month
+    - sum_biltiesWeight_by_month
+    - average_cartage_per_bilty_by_month
+    - maximum_bilty_weight_by_month
+    - branch_wise_sum_bilties_weight_by_month
+    - total_crossing_challan_by_month
+    - paid_crossing_challans_by_month
+    - unpaid_crossing_challans_by_month
+    - vehicle_wise_crossing_challan_summary_by_month
+    - sum_paid_amount_by_month
+    - total_unpaid_amount_by_month
+    - daily_paid_amount_trend_by_month
+    - branch_wise_paid_amount_by_month
+    - paid_amount_due_by_month
+    - total_overdue_amount_by_month
+    - top_10_customers_with_highest_due_amount
+    - payment_recovery_rate_by_month
+    - total_Vehicle_Load_by_month
+    - average_vehicle_load_by_month
+    - maximum_vehicle_load_by_month
+    - route_wise_vehicle_load_summary_by_month
+    - branch_godown_wise_total_cartage
+    - branch_wise_paid_vs_unpaid_cartage
+    - godown_wise_cartage_share
+    - monthly_cartage_comparison_by_month
+    - branch_godown_wise_total_paid_bilty
+    - branch_wise_unpaid_bilties
+    - godown_wise_paid_bilty_share
+    - monthly_paid_bilty_comparison_by_month
+    - booking_bilty_by_month_summary
+    - booking_bilty_count_per_day
+    - booking_bilty_weight_summary
+    - branch_wise_booking_bilty_breakdown
